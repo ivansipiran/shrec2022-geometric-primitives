@@ -1,0 +1,1 @@
+# shrec2022-geometric-primitives
