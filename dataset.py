@@ -30,8 +30,8 @@ def normalize(points, unit_ball = False):
         scale = 2 * max_distance
         normalized_points = normalized_points/(2 * max_distance)
 
-    #return normalized_points, scale
-    return normalized_points
+    return normalized_points, scale
+    #return normalized_points
 
 class DatasetSHREC2022(data.Dataset):
     def __init__(self, root, npoints=2048, split='train'):
@@ -128,18 +128,88 @@ class DatasetPlane(data.Dataset):
         
         return normal,normalize(pcd, unit_ball=True)
 
-if __name__== '__main__':
-    input_path = '/media/ivan/a68c0147-4423-4f62-8e54-388f4ace9ec54/Datasets/SHREC2022/dataset/training'
+class DatasetCylinder(data.Dataset):
+    def __init__(self, root, npoints=2048, split='train'):
+        self.root = root
+        self.npoints = npoints
+        self.split = split
+        self.filepaths = [os.path.normpath(fi) for fi in sorted(glob.glob(self.root+'/pointCloud/*.txt'))]
+        self.filesplit = []
+        
+        print(len(self.filepaths))
+        self.objectClass = dict()
+        
+        for i in range(5):
+            self.objectClass[i] = []
+            
+        for filename in self.filepaths:
+            gtfile = self.root + '/GTpointCloud/GT' + filename.split('\\')[-1]
+            gtfile = os.path.normpath(gtfile)
+            
+            with open(gtfile, 'r') as f:
+                cl = f.readline()
+            self.objectClass[int(cl)-1].append(filename)
+
+        self.classes = []
+
+        if self.split == 'train':
+            self.filesplit.extend(self.objectClass[1][:7360])
+            #self.classes.extend([i for j in range(7360)])
+        elif self.split == 'val':
+            self.filesplit.extend(self.objectClass[1][7360:])
+            #self.classes.extend([i for j in range(1840)])
+
+    def __len__(self):
+        return len(self.filesplit)
     
+    def __getitem__(self, idx):
+        filename = self.filesplit[idx]
+
+        pcd = np.loadtxt(filename, delimiter=',')
+        
+        if self.npoints != 0:
+            pcd = resample_pcd(pcd, self.npoints)
+        
+        gtfile = self.root + '/GTpointCloud/GT' + filename.split('\\')[-1]
+        gtfile = os.path.normpath(gtfile)
+
+        with open(gtfile, 'r') as f:
+            cl = f.readline()
+            radius = f.readline()
+            n1 = f.readline()
+            n2 = f.readline()
+            n3 = f.readline()
+        
+        normal = np.array([float(n1), float(n2), float(n3)])
+        norm_points, scale = normalize(pcd, unit_ball=True)
+        
+        return float(radius), scale,  normal, norm_points
+
+if __name__== '__main__':
+    input_path = r"C:\Users\56950\Documents\Datasets\SHREC2022\dataset\training"
+
+    #Entire dataset    
     #dataset = DatasetSHREC2022(root=input_path, npoints=2048, split='train')
     #dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,shuffle=True, num_workers=4)
     #cl, target = next(iter(dataloader))
     #print(target.shape)
 
-    dataset = DatasetPlane(root=input_path, npoints=2048, split='val')
-    dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,shuffle=False, num_workers=0)
-    cl, target = next(iter(dataloader))
+    #Plane dataset
+    #dataset = DatasetPlane(root=input_path, npoints=2048, split='val')
+    #dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,shuffle=False, num_workers=0)
+    #cl, target = next(iter(dataloader))
 
+    #Cylinder dataset
+    dataset = DatasetCylinder(root=input_path, npoints=2048, split='train')
+    dataloader = torch.utils.data.DataLoader(dataset,batch_size=32,shuffle=False, num_workers=0)
     print(len(dataset))
-    print(cl.shape)
-    print(target.shape)
+    rad, scale, norm, target = next(iter(dataloader))
+
+    print(rad)
+    print(scale)
+    print(norm)
+    print(target)
+    #print(len(dataset))
+    #print(rad.shape)
+    #print(norm.shape)
+    #print(target.shape)
