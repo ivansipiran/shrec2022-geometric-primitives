@@ -4,6 +4,10 @@ This repository contains the method used in the contest "SHREC 2022: Fitting and
 
 Our method consists of two stages: point cloud classification and parameters regression. 
 
+## Specifications
+This method was tested in a Linux system, 64 bits, with 32GB RAM and a GPU NVIDIA RTX 2080 of 8GB. The method was tested with Python 3.6 and Pytorch.
+
+
 ## Networks training
 In this repository, we provide the trained networks to perform the task. Nevertheless, here we also describe how we train the models.
 
