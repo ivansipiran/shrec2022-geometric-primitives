@@ -10,7 +10,16 @@ from dataset import DatasetSHREC2022
 from model import PointNetCls, feature_transform_regularizer
 import torch.nn.functional as F
 from tqdm import tqdm
+import visdom
+import numpy as np
 
+def vis_curve(curve, window, name, vis):
+    vis.line(X=np.arange(len(curve)),
+                 Y=np.array(curve),
+                 win=window,
+                 opts=dict(title=name, legend=[name + "_curve"], markersize=2, ), )
+
+vis = visdom.Visdom(port = 8997, env="TRAIN")
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -86,9 +95,7 @@ testdataloader = torch.utils.data.DataLoader(
         shuffle=True,
         num_workers=int(opt.workers))
 
-print(len(dataset), len(test_dataset))
-num_classes = len(dataset.classes)
-print('classes', num_classes)
+num_classes = 5
 
 try:
     os.makedirs(opt.outf)
@@ -107,11 +114,13 @@ classifier.cuda()
 
 num_batch = len(dataset) / opt.batchSize
 
+accTrain = []
+accTest = []
+
 for epoch in range(opt.nepoch):
     scheduler.step()
     for i, data in enumerate(dataloader, 0):
         target, points = data
-        #target = target[:, 0]
         points = points.transpose(2, 1)
         points, target = points.cuda().float(), target.cuda()
         optimizer.zero_grad()
@@ -125,19 +134,21 @@ for epoch in range(opt.nepoch):
         pred_choice = pred.data.max(1)[1]
         correct = pred_choice.eq(target.data).cpu().sum()
         print('[%d: %d/%d] train loss: %f accuracy: %f' % (epoch, i, num_batch, loss.item(), correct.item() / float(opt.batchSize)))
+        accTrain.append(correct.item() / float(opt.batchSize))
+        vis_curve(accTrain, "train", "train", vis)
 
-        if i % 10 == 0:
-            j, data = next(enumerate(testdataloader, 0))
-            target, points = data
-            #target = target[:, 0]
-            points = points.transpose(2, 1)
-            points, target = points.cuda().float(), target.cuda()
-            classifier = classifier.eval()
-            pred, _, _ = classifier(points)
-            loss = F.nll_loss(pred, target)
-            pred_choice = pred.data.max(1)[1]
-            correct = pred_choice.eq(target.data).cpu().sum()
-            print('[%d: %d/%d] %s loss: %f accuracy: %f' % (epoch, i, num_batch, blue('test'), loss.item(), correct.item()/float(opt.batchSize)))
+    for i,data in tqdm(enumerate(testdataloader, 0)):
+        target, points = data
+        points = points.transpose(2, 1)
+        points, target = points.cuda().float(), target.cuda()
+        classifier = classifier.eval()
+        pred, _, _ = classifier(points)
+        loss = F.nll_loss(pred, target)
+        pred_choice = pred.data.max(1)[1]
+        correct = pred_choice.eq(target.data).cpu().sum()
+        print('[%d: %d/%d] %s loss: %f accuracy: %f' % (epoch, i, num_batch, blue('test'), loss.item(), correct.item()/float(opt.batchSize)))
+        accTest.append(correct.item()/float(opt.batchSize))
+        vis_curve(accTest, "test", "test", vis)
 
     torch.save(classifier.state_dict(), '%s/cls_model_%d.pth' % (opt.outf, epoch))
 
@@ -145,7 +156,6 @@ total_correct = 0
 total_testset = 0
 for i,data in tqdm(enumerate(testdataloader, 0)):
     target, points = data
-    #target = target[:, 0]
     points = points.transpose(2, 1)
     points, target = points.cuda().float(), target.cuda()
     classifier = classifier.eval()

@@ -67,8 +67,6 @@ testdataloader = torch.utils.data.DataLoader(
         num_workers=int(opt.workers))
 
 print(len(dataset), len(test_dataset))
-#num_classes = len(dataset.classes)
-#print('classes', num_classes)
 
 try:
     os.makedirs(opt.outf)
@@ -95,38 +93,19 @@ for epoch in range(opt.nepoch):
     scheduler.step()
     for i, data in enumerate(dataloader, 0):
         target, points = data
-        #target = target[:, 0]
         points = points.transpose(2, 1)
         points, target = points.cuda().float(), target.cuda().float()
-        #print(target)
         optimizer.zero_grad()
         classifier = classifier.train()
         pred = classifier(points)
-        #print(pred)
         loss = 1.0 - torch.pow(F.cosine_similarity(pred, target),9)
-        #print(loss)
         loss.mean().backward()
         optimizer.step()
-        #pred_choice = pred.data.max(1)[1]
-        #correct = pred_choice.eq(target.data).cpu().sum()
         print('[%d: %d/%d] train loss: %f' % (epoch, i, num_batch, loss.mean().item()))
 
         lossTrainValues.append(loss.mean().item())
         vis_curve(lossTrainValues, "train", "train", vis)
 
-        #if i % 10 == 0:
-        #    j, data = next(enumerate(testdataloader, 0))
-        #    target, points = data
-            #target = target[:, 0]
-        #    points = points.transpose(2, 1)
-        #    points, target = points.cuda().float(), target.cuda()
-        #    classifier = classifier.eval()
-        #    pred, _, _ = classifier(points)
-        #    loss = F.nll_loss(pred, target)
-        #    pred_choice = pred.data.max(1)[1]
-         #   correct = pred_choice.eq(target.data).cpu().sum()
-         #   print('[%d: %d/%d] %s loss: %f accuracy: %f' % (epoch, i, num_batch, blue('test'), loss.item(), correct.item()/float(opt.batchSize)))
-    
     #Validation after one epoch
     running_loss = 0
     cont = 0
@@ -146,14 +125,11 @@ for epoch in range(opt.nepoch):
 
     torch.save(classifier.state_dict(), '%s/cls_model_%d.pth' % (opt.outf, epoch))
 
-#total_correct = 0
-#total_testset = 0
 running_loss = 0
 cont = 0
 
 for i,data in tqdm(enumerate(testdataloader, 0)):
     target, points = data
-    #target = target[:, 0]
     points = points.transpose(2, 1)
     points, target = points.cuda().float(), target.cuda().float()
     classifier = classifier.eval()
@@ -167,10 +143,5 @@ for i,data in tqdm(enumerate(testdataloader, 0)):
     loss = 1.0 - torch.pow(F.cosine_similarity(pred, target),9)
     running_loss += loss.item()
     cont = cont + 1
-    #pred_choice = pred.data.max(1)[1]
-    #correct = pred_choice.eq(target.data).cpu().sum()
-    #total_correct += correct.item()
-    #total_testset += points.size()[0]
-
-print("final accuracy {}".format(running_loss / float(cont)))
-print(cont)
+    
+print("final loss {}".format(running_loss / float(cont)))
